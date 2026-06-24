@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiService } from '../../services/api';
 import { toast } from '../../components/Toast';
+import { useTranslation } from 'react-i18next';
 import {
   GraduationCap,
   Search,
@@ -26,6 +27,9 @@ import { CreateStudentDto, UpdateStudentDto, CreateStudentProfileDto, UpdateStud
 
 export default function StudentsPage() {
   const queryClient = useQueryClient();
+  const { t, i18n } = useTranslation();
+  const isRtl = i18n.language === 'ar';
+
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<'all' | 'active' | 'suspended' | 'graduated'>('all');
   const [selectedStudentId, setSelectedStudentId] = useState<number | null>(null);
@@ -62,122 +66,146 @@ export default function StudentsPage() {
     },
   });
 
-  // Selected student sub-queries
+  // Selected student details (only runs if selectedStudentId is not null)
   const { data: studentDetail } = useQuery({
     queryKey: ['student', selectedStudentId],
     queryFn: () => apiService.students.getById(selectedStudentId!),
     enabled: selectedStudentId !== null,
   });
 
-  const { data: studentProfile, error: profileError } = useQuery({
+  const { data: studentProfile } = useQuery({
     queryKey: ['studentProfile', selectedStudentId],
-    queryFn: () => apiService.students.getProfile(selectedStudentId!),
+    queryFn: async () => {
+      try {
+        return await apiService.students.getProfile(selectedStudentId!);
+      } catch (err: any) {
+        if (err.response?.status === 404 || err.response?.status === 500) {
+          return null;
+        }
+        throw err;
+      }
+    },
     enabled: selectedStudentId !== null,
-    retry: false, // Don't keep retrying if profile is 404 (does not exist yet)
   });
 
   const { data: studentEnrollments } = useQuery({
     queryKey: ['studentEnrollments', selectedStudentId],
-    queryFn: () => apiService.students.getEnrollments(selectedStudentId!),
+    queryFn: async () => {
+      try {
+        return await apiService.students.getEnrollments(selectedStudentId!);
+      } catch (err: any) {
+        if (err.response?.status === 404 || err.response?.status === 500) {
+          return [];
+        }
+        throw err;
+      }
+    },
     enabled: selectedStudentId !== null,
   });
 
-  // 2. Mutations
+  // Mutations
   const createMutation = useMutation({
-    mutationFn: apiService.students.create,
+    mutationFn: (dto: CreateStudentDto) => apiService.students.create(dto),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['students'] });
-      toast.success('Student Registered', 'New student account created successfully.');
+      toast.success(t('students.addStudentSuccess'), t('students.addStudentSuccessDesc'));
       setCreateModalOpen(false);
-      resetStudentForm();
+      resetForm();
     },
     onError: (err: any) => {
-      toast.error('Registration Failed', err.response?.data?.message || 'Failed to register student.');
+      toast.error(t('common.error'), err.response?.data?.message || err.message);
     },
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: UpdateStudentDto }) =>
-      apiService.students.update(id, data),
+    mutationFn: ({ id, dto }: { id: number; dto: UpdateStudentDto }) =>
+      apiService.students.update(id, dto),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['students'] });
       queryClient.invalidateQueries({ queryKey: ['student', selectedStudentId] });
-      toast.success('Student Updated', 'Profile details updated.');
+      toast.success(t('students.updateStudentSuccess'), t('students.updateStudentSuccessDesc'));
       setEditModalOpen(false);
     },
     onError: (err: any) => {
-      toast.error('Update Failed', err.response?.data?.message || 'Failed to update student.');
+      toast.error(t('common.error'), err.response?.data?.message || err.message);
     },
   });
 
   const deleteMutation = useMutation({
-    mutationFn: apiService.students.delete,
+    mutationFn: (id: number) => apiService.students.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['students'] });
-      toast.success('Student Deleted', 'Student account removed.');
       setSelectedStudentId(null);
+      toast.success(t('students.deleteStudentSuccess'), t('students.deleteStudentSuccessDesc'));
     },
     onError: (err: any) => {
-      toast.error('Deletion Failed', err.response?.data?.message || 'Failed to delete student.');
+      toast.error(t('common.error'), err.response?.data?.message || err.message);
     },
   });
 
-  // Quick state transitions
   const activateMutation = useMutation({
-    mutationFn: apiService.students.activate,
+    mutationFn: (id: number) => apiService.students.activate(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['students'] });
       queryClient.invalidateQueries({ queryKey: ['student', selectedStudentId] });
-      toast.success('Activated', 'Student account is now active.');
+      toast.success(t('common.success'), t('students.updateStudentSuccessDesc'));
+    },
+    onError: (err: any) => {
+      toast.error(t('common.error'), err.response?.data?.message || err.message);
     },
   });
 
   const suspendMutation = useMutation({
-    mutationFn: apiService.students.suspend,
+    mutationFn: (id: number) => apiService.students.suspend(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['students'] });
       queryClient.invalidateQueries({ queryKey: ['student', selectedStudentId] });
-      toast.success('Suspended', 'Student status changed to Suspended.');
+      toast.success(t('common.success'), t('students.updateStudentSuccessDesc'));
+    },
+    onError: (err: any) => {
+      toast.error(t('common.error'), err.response?.data?.message || err.message);
     },
   });
 
   const graduateMutation = useMutation({
-    mutationFn: apiService.students.graduate,
+    mutationFn: (id: number) => apiService.students.graduate(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['students'] });
       queryClient.invalidateQueries({ queryKey: ['student', selectedStudentId] });
-      toast.success('Graduated', 'Student marked as Graduated.');
+      toast.success(t('common.success'), t('students.updateStudentSuccessDesc'));
+    },
+    onError: (err: any) => {
+      toast.error(t('common.error'), err.response?.data?.message || err.message);
     },
   });
 
-  // Profile Mutations
   const saveProfileMutation = useMutation({
-    mutationFn: ({ id, data, exists }: { id: number; data: CreateStudentProfileDto; exists: boolean }) => {
-      if (exists) {
-        return apiService.students.updateProfile(id, data as UpdateStudentProfileDto);
-      } else {
-        return apiService.students.createProfile(id, data);
-      }
-    },
+    mutationFn: ({ id, dto, exists }: { id: number; dto: CreateStudentProfileDto; exists: boolean }) =>
+      exists
+        ? apiService.students.updateProfile(id, dto)
+        : apiService.students.createProfile(id, dto),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['studentProfile', selectedStudentId] });
-      toast.success('Profile Saved', 'Student metadata profile successfully saved.');
+      toast.success(t('students.updateProfileSuccess'), t('students.updateProfileSuccessDesc'));
       setProfileModalOpen(false);
     },
     onError: (err: any) => {
-      toast.error('Failed to Save Profile', err.response?.data?.message || 'Error occurred.');
+      toast.error(t('common.error'), err.response?.data?.message || err.message);
     },
   });
 
   const deleteProfileMutation = useMutation({
-    mutationFn: apiService.students.deleteProfile,
+    mutationFn: (id: number) => apiService.students.deleteProfile(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['studentProfile', selectedStudentId] });
-      toast.success('Profile Deleted', 'Demographic profile cleared.');
+      toast.success(t('students.deleteProfileSuccess'), t('students.deleteProfileSuccessDesc'));
+    },
+    onError: (err: any) => {
+      toast.error(t('common.error'), err.response?.data?.message || err.message);
     },
   });
 
-  const resetStudentForm = () => {
+  const resetForm = () => {
     setFormFirstName('');
     setFormLastName('');
     setFormEmail('');
@@ -189,22 +217,23 @@ export default function StudentsPage() {
 
   const handleCreateSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const payload: CreateStudentDto = {
+    createMutation.mutate({
       firstName: formFirstName,
       lastName: formLastName,
       email: formEmail,
       password: formPassword || 'StudentPass123!',
-      phoneNumber: formPhone,
+      phoneNumber: formPhone || null,
       dateOfBirth: formDOB,
       status: formStatus,
-    };
-    createMutation.mutate(payload);
+    });
   };
 
   const handleEditOpen = () => {
     if (!studentDetail) return;
-    setFormFirstName(studentDetail.fullName?.split(' ')[0] || '');
-    setFormLastName(studentDetail.fullName?.split(' ')[1] || '');
+    const names = (studentDetail.fullName || '').split(' ');
+    setFormFirstName(names[0] || '');
+    setFormLastName(names.slice(1).join(' ') || '');
+    setFormEmail(studentDetail.email);
     setFormPassword('');
     setFormPhone(studentDetail.phoneNumber || '');
     setFormStatus(studentDetail.status);
@@ -214,14 +243,16 @@ export default function StudentsPage() {
   const handleEditSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedStudentId) return;
-    const payload: UpdateStudentDto = {
-      firstName: formFirstName,
-      lastName: formLastName,
-      password: formPassword || null,
-      status: formStatus,
-      phoneNumber: formPhone,
-    };
-    updateMutation.mutate({ id: selectedStudentId, data: payload });
+    updateMutation.mutate({
+      id: selectedStudentId,
+      dto: {
+        firstName: formFirstName,
+        lastName: formLastName,
+        phoneNumber: formPhone || null,
+        status: formStatus,
+        password: formPassword.trim() ? formPassword : null,
+      },
+    });
   };
 
   const handleProfileOpen = () => {
@@ -244,113 +275,116 @@ export default function StudentsPage() {
   const handleProfileSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedStudentId) return;
-    const profileExists = !!studentProfile && !profileError;
-    const payload: CreateStudentProfileDto = {
-      address: profAddress,
-      city: profCity,
-      country: profCountry,
-      bio: profBio,
-      linkedInUrl: profLinkedIn,
-    };
-    saveProfileMutation.mutate({ id: selectedStudentId, data: payload, exists: profileExists });
+    saveProfileMutation.mutate({
+      id: selectedStudentId,
+      exists: !!studentProfile,
+      dto: {
+        address: profAddress || null,
+        city: profCity || null,
+        country: profCountry || null,
+        bio: profBio || null,
+        linkedInUrl: profLinkedIn || null,
+      },
+    });
   };
 
-  const filteredStudents = students?.filter((std) => {
-    const query = searchQuery.toLowerCase();
-    return (
-      std.fullName?.toLowerCase().includes(query) ||
-      std.email?.toLowerCase().includes(query) ||
-      std.studentId.toString().includes(query)
-    );
-  }) || [];
+  const filteredStudents = students
+    ? students.filter((std) => {
+        const query = searchQuery.toLowerCase();
+        return (
+          std.fullName.toLowerCase().includes(query) ||
+          std.email.toLowerCase().includes(query) ||
+          std.studentId.toString().includes(query)
+        );
+      })
+    : [];
 
   return (
     <div className="space-y-6">
-      {/* Header Controls */}
+      {/* Header section */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Students Body</h1>
-          <p className="text-xs text-zinc-500 mt-1">Manage corporate students, demographic profiles, and progress logs</p>
+          <h1 className="text-xl font-bold tracking-tight">{t('students.directoryTitle')}</h1>
+          <p className="text-xs text-zinc-500 mt-0.5">{t('dashboard.resourcesSubtitle')}</p>
         </div>
         <button
           onClick={() => {
-            resetStudentForm();
+            resetForm();
             setCreateModalOpen(true);
           }}
-          className="flex items-center justify-center gap-2 px-4 py-2 text-xs font-semibold text-white dark:text-zinc-950 bg-zinc-900 dark:bg-zinc-50 hover:bg-zinc-800 dark:hover:bg-zinc-100 rounded-xl shadow-md transition-all cursor-pointer"
+          className="flex items-center justify-center gap-1.5 px-4 py-2 text-xs font-semibold text-white dark:text-zinc-950 bg-zinc-900 dark:bg-zinc-50 hover:bg-zinc-800 dark:hover:bg-zinc-100 rounded-xl shadow-sm transition-all cursor-pointer"
         >
           <Plus className="w-4 h-4" />
-          Register Student
+          <span>{t('students.addStudent')}</span>
         </button>
       </div>
 
-      {/* Tabs and search filters */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-sm">
-        {/* Status filters */}
+      {/* Filter Tabs & Search Box */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-zinc-100/60 dark:bg-zinc-900/40 p-1.5 rounded-2xl border border-zinc-200/50 dark:border-zinc-800/50">
         <div className="flex bg-zinc-100 dark:bg-zinc-950 p-1 rounded-xl w-fit flex-wrap gap-1">
           <button
             onClick={() => {
               setActiveTab('all');
               setSelectedStudentId(null);
             }}
-            className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
+            className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
               activeTab === 'all'
                 ? 'bg-white dark:bg-zinc-900 shadow-sm text-zinc-900 dark:text-zinc-50'
                 : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300'
             }`}
           >
-            All Students
+            {t('common.all')}
           </button>
           <button
             onClick={() => {
               setActiveTab('active');
               setSelectedStudentId(null);
             }}
-            className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
+            className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
               activeTab === 'active'
                 ? 'bg-white dark:bg-zinc-900 shadow-sm text-zinc-900 dark:text-zinc-50'
                 : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300'
             }`}
           >
-            Active
+            {t('common.active')}
           </button>
           <button
             onClick={() => {
               setActiveTab('suspended');
               setSelectedStudentId(null);
             }}
-            className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
+            className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
               activeTab === 'suspended'
                 ? 'bg-white dark:bg-zinc-900 shadow-sm text-zinc-900 dark:text-zinc-50'
                 : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300'
             }`}
           >
-            Suspended
+            {t('students.suspendedStatus')}
           </button>
           <button
             onClick={() => {
               setActiveTab('graduated');
               setSelectedStudentId(null);
             }}
-            className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
+            className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
               activeTab === 'graduated'
                 ? 'bg-white dark:bg-zinc-900 shadow-sm text-zinc-900 dark:text-zinc-50'
                 : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300'
             }`}
           >
-            Graduated
+            {t('students.graduatedStatus')}
           </button>
         </div>
 
         {/* Search */}
         <div className="relative max-w-sm w-full">
-          <Search className="absolute left-3 top-2.5 w-4 h-4 text-zinc-400" />
+          <Search className={`absolute ${isRtl ? 'right-3' : 'left-3'} top-2.5 w-4 h-4 text-zinc-400`} />
           <input
             type="text"
-            placeholder="Search by ID, name or email..."
+            placeholder={t('students.searchPlaceholder')}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-4 py-1.5 text-xs rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 focus:outline-none focus:ring-1 focus:ring-zinc-900 dark:focus:ring-zinc-50 transition-all"
+            className={`w-full ${isRtl ? 'pr-9 pl-4' : 'pl-9 pr-4'} py-1.5 text-xs rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 focus:outline-none focus:ring-1 focus:ring-zinc-900 dark:focus:ring-zinc-50 transition-all`}
           />
         </div>
       </div>
@@ -359,28 +393,30 @@ export default function StudentsPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Side Student List */}
         <div className={`lg:col-span-2 p-6 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm space-y-4 ${selectedStudentId ? 'hidden lg:block' : 'block'}`}>
-          <h2 className="text-sm font-bold uppercase tracking-wider text-zinc-400">Students Directory ({filteredStudents.length})</h2>
+          <h2 className="text-sm font-bold uppercase tracking-wider text-zinc-400">
+            {t('students.directoryTitle')} ({filteredStudents.length})
+          </h2>
 
           {isLoading ? (
             <div className="py-12 flex flex-col items-center justify-center gap-2">
               <Loader2 className="w-6 h-6 animate-spin text-zinc-500" />
-              <p className="text-xs text-zinc-400">Loading directory index...</p>
+              <p className="text-xs text-zinc-400">{t('students.loadingList')}</p>
             </div>
           ) : filteredStudents.length === 0 ? (
             <div className="py-12 text-center border border-dashed border-zinc-200 dark:border-zinc-800 rounded-xl space-y-2">
               <GraduationCap className="w-8 h-8 text-zinc-300 mx-auto" />
-              <p className="text-xs font-medium text-zinc-400">No student records found.</p>
+              <p className="text-xs font-medium text-zinc-400">{t('students.noStudents')}</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
+              <table className={`w-full ${isRtl ? 'text-right' : 'text-left'} text-xs`}>
                 <thead>
                   <tr className="border-b border-zinc-100 dark:border-zinc-800 text-zinc-400 font-semibold uppercase tracking-wider">
-                    <th className="py-3 px-2">ID</th>
-                    <th className="py-3 px-2">Student Name</th>
-                    <th className="py-3 px-2">Phone</th>
-                    <th className="py-3 px-2">Status</th>
-                    <th className="py-3 px-2 text-right">Detail</th>
+                    <th className="py-3 px-2">{t('common.id')}</th>
+                    <th className="py-3 px-2">{t('students.addStudent')}</th>
+                    <th className="py-3 px-2">{t('students.phone')}</th>
+                    <th className="py-3 px-2">{t('common.status')}</th>
+                    <th className={`py-3 px-2 ${isRtl ? 'text-left' : 'text-right'}`}>{t('common.actions')}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/40 font-medium">
@@ -412,11 +448,15 @@ export default function StudentsPage() {
                                 : 'bg-amber-50 dark:bg-amber-950/20 text-amber-600 dark:text-amber-400'
                             }`}
                           >
-                            {std.status}
+                            {std.status === 'Active' ? t('common.active') : std.status === 'Suspended' ? t('students.suspendedStatus') : t('students.graduatedStatus')}
                           </span>
                         </td>
-                        <td className="py-3.5 px-2 text-right">
-                          <ChevronRight className="w-4 h-4 text-zinc-400 inline" />
+                        <td className={`py-3.5 px-2 ${isRtl ? 'text-left' : 'text-right'}`}>
+                          {isRtl ? (
+                            <ChevronLeft className="w-4 h-4 text-zinc-400 inline" />
+                          ) : (
+                            <ChevronRight className="w-4 h-4 text-zinc-400 inline" />
+                          )}
                         </td>
                       </tr>
                     );
@@ -433,52 +473,52 @@ export default function StudentsPage() {
             <div className="h-full py-16 flex flex-col items-center justify-center text-center gap-3">
               <GraduationCap className="w-10 h-10 text-zinc-300" />
               <div>
-                <h3 className="text-xs font-bold uppercase tracking-wider">Student Workspace</h3>
+                <h3 className="text-xs font-bold uppercase tracking-wider">{t('students.detailsPlaceholderTitle')}</h3>
                 <p className="text-xs text-zinc-400 max-w-xs mt-1 leading-relaxed">
-                  Select a student from the index to review address locations, LinkedIn bios, demographic settings, status overrides, and enrollment course records.
+                  {t('students.detailsPlaceholderDesc')}
                 </p>
               </div>
             </div>
           ) : !studentDetail ? (
             <div className="py-12 flex flex-col items-center justify-center gap-2">
               <Loader2 className="w-6 h-6 animate-spin text-zinc-500" />
-              <p className="text-xs text-zinc-400">Loading student dossier...</p>
+              <p className="text-xs text-zinc-400">{t('common.loading')}</p>
             </div>
           ) : (
             <div className="space-y-6 animate-fade-in">
               {/* Back button for mobile screens */}
               <button
                 onClick={() => setSelectedStudentId(null)}
-                className="lg:hidden mb-4 flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                className="lg:hidden mb-4 flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
               >
-                <ChevronLeft className="w-4 h-4" />
-                Back to Students Directory
+                {isRtl ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+                <span>{t('students.backToFaculty')}</span>
               </button>
 
               {/* Workspace Header */}
               <div className="pb-4 border-b border-zinc-100 dark:border-zinc-800">
                 <div className="flex justify-between items-start gap-2">
                   <div>
-                    <span className="text-[10px] font-mono font-bold text-zinc-400">STUDENT ID: {studentDetail.studentId}</span>
+                    <span className="text-[10px] font-mono font-bold text-zinc-400">{t('students.studentId')}: {studentDetail.studentId}</span>
                     <h2 className="text-base font-bold tracking-tight mt-0.5">{studentDetail.fullName}</h2>
                     <p className="text-xs text-zinc-400">{studentDetail.email}</p>
                   </div>
                   <div className="flex gap-1">
                     <button
                       onClick={handleEditOpen}
-                      className="p-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500 dark:text-zinc-400"
-                      title="Edit Account"
+                      className="p-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500 dark:text-zinc-400 cursor-pointer"
+                      title={t('common.edit')}
                     >
                       <Edit2 className="w-3.5 h-3.5" />
                     </button>
                     <button
                       onClick={() => {
-                        if (confirm('Are you absolutely sure you want to delete this student and their historical records?')) {
+                        if (confirm(t('students.deleteConfirm'))) {
                           deleteMutation.mutate(studentDetail.studentId);
                         }
                       }}
-                      className="p-1.5 rounded-lg border border-rose-200/50 dark:border-rose-900/30 hover:bg-rose-50 dark:hover:bg-rose-950/20 text-rose-600"
-                      title="Delete Account"
+                      className="p-1.5 rounded-lg border border-rose-200/50 dark:border-rose-900/30 hover:bg-rose-50 dark:hover:bg-rose-950/20 text-rose-600 cursor-pointer"
+                      title={t('common.delete')}
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
@@ -490,28 +530,28 @@ export default function StudentsPage() {
                   {studentDetail.status !== 'Active' && (
                     <button
                       onClick={() => activateMutation.mutate(studentDetail.studentId)}
-                      className="flex-1 py-1 px-2.5 rounded-lg text-[10px] font-bold uppercase tracking-wider border border-emerald-200 dark:border-emerald-900/30 text-emerald-600 dark:text-emerald-400 flex items-center justify-center gap-1"
+                      className="flex-1 py-1 px-2.5 rounded-lg text-[10px] font-bold uppercase tracking-wider border border-emerald-200 dark:border-emerald-900/30 text-emerald-600 dark:text-emerald-400 flex items-center justify-center gap-1 cursor-pointer"
                     >
                       <UserCheck className="w-3 h-3" />
-                      Activate
+                      <span>{t('common.active')}</span>
                     </button>
                   )}
                   {studentDetail.status !== 'Suspended' && (
                     <button
                       onClick={() => suspendMutation.mutate(studentDetail.studentId)}
-                      className="flex-1 py-1 px-2.5 rounded-lg text-[10px] font-bold uppercase tracking-wider border border-rose-200 dark:border-rose-900/30 text-rose-600 dark:text-rose-400 flex items-center justify-center gap-1"
+                      className="flex-1 py-1 px-2.5 rounded-lg text-[10px] font-bold uppercase tracking-wider border border-rose-200 dark:border-rose-900/30 text-rose-600 dark:text-rose-400 flex items-center justify-center gap-1 cursor-pointer"
                     >
                       <UserX className="w-3 h-3" />
-                      Suspend
+                      <span>{t('students.suspendedStatus')}</span>
                     </button>
                   )}
                   {studentDetail.status !== 'Graduated' && (
                     <button
                       onClick={() => graduateMutation.mutate(studentDetail.studentId)}
-                      className="flex-1 py-1 px-2.5 rounded-lg text-[10px] font-bold uppercase tracking-wider border border-amber-200 dark:border-amber-900/30 text-amber-600 dark:text-amber-400 flex items-center justify-center gap-1"
+                      className="flex-1 py-1 px-2.5 rounded-lg text-[10px] font-bold uppercase tracking-wider border border-amber-200 dark:border-amber-900/30 text-amber-600 dark:text-amber-400 flex items-center justify-center gap-1 cursor-pointer"
                     >
                       <Award className="w-3 h-3" />
-                      Graduate
+                      <span>{t('students.graduatedStatus')}</span>
                     </button>
                   )}
                 </div>
@@ -520,16 +560,16 @@ export default function StudentsPage() {
               {/* DOB, Phone, Date */}
               <div className="grid grid-cols-2 gap-4 text-xs pb-4 border-b border-zinc-100 dark:border-zinc-800">
                 <div className="space-y-1">
-                  <span className="text-zinc-400 block font-semibold uppercase tracking-wider text-[9px]">Date of Birth</span>
+                  <span className="text-zinc-400 block font-semibold uppercase tracking-wider text-[9px]">{t('students.dob')}</span>
                   <span className="font-bold text-zinc-800 dark:text-zinc-200 flex items-center gap-1">
                     <Calendar className="w-3.5 h-3.5 text-zinc-400" />
-                    {new Date(studentDetail.dateOfBirth).toLocaleDateString()}
+                    <span>{new Date(studentDetail.dateOfBirth).toLocaleDateString(i18n.language)}</span>
                   </span>
                 </div>
                 <div className="space-y-1">
-                  <span className="text-zinc-400 block font-semibold uppercase tracking-wider text-[9px]">Registered At</span>
+                  <span className="text-zinc-400 block font-semibold uppercase tracking-wider text-[9px]">{t('students.registeredAt')}</span>
                   <span className="font-bold text-zinc-800 dark:text-zinc-200">
-                    {new Date(studentDetail.registeredAt).toLocaleDateString()}
+                    {new Date(studentDetail.registeredAt).toLocaleDateString(i18n.language)}
                   </span>
                 </div>
               </div>
@@ -539,13 +579,13 @@ export default function StudentsPage() {
                 <div className="flex justify-between items-center">
                   <h4 className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 flex items-center gap-1">
                     <FileText className="w-3.5 h-3.5" />
-                    Biographic Profile
+                    <span>{t('students.biographicProfile')}</span>
                   </h4>
                   <button
                     onClick={handleProfileOpen}
-                    className="text-[10px] font-semibold text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100"
+                    className="text-[10px] font-semibold text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 cursor-pointer"
                   >
-                    {studentProfile ? 'Edit Profile' : 'Create Profile'}
+                    {studentProfile ? t('students.editProfile') : t('students.createProfile')}
                   </button>
                 </div>
 
@@ -596,7 +636,7 @@ export default function StudentsPage() {
                           deleteProfileMutation.mutate(studentDetail.studentId);
                         }
                       }}
-                      className="absolute top-2 right-2 p-1 text-zinc-300 hover:text-rose-500 rounded"
+                      className={`absolute top-2 ${isRtl ? 'left-2' : 'right-2'} p-1 text-zinc-300 hover:text-rose-500 rounded cursor-pointer`}
                       title="Clear Profile"
                     >
                       <X className="w-3 h-3" />
@@ -609,7 +649,7 @@ export default function StudentsPage() {
               <div className="space-y-3 pt-4 border-t border-zinc-100 dark:border-zinc-800">
                 <h4 className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 flex items-center gap-1">
                   <ClipboardList className="w-3.5 h-3.5 text-zinc-400" />
-                  Course Enrollment History ({studentEnrollments?.length || 0})
+                  <span>{t('students.courseHistory')} ({studentEnrollments?.length || 0})</span>
                 </h4>
 
                 {studentEnrollments?.length === 0 ? (
@@ -629,11 +669,11 @@ export default function StudentsPage() {
                                 : 'bg-rose-50 text-rose-500'
                             }`}
                           >
-                            {en.status}
+                            {en.status === 'Active' ? t('common.active') : en.status === 'Completed' ? t('enrollments.completed') : t('enrollments.dropped')}
                           </span>
                         </div>
                         <div className="flex justify-between text-[10px] text-zinc-400">
-                          <span>Registered: {new Date(en.enrollmentDate).toLocaleDateString()}</span>
+                          <span>{t('dashboard.tableDate')}: {new Date(en.enrollmentDate).toLocaleDateString(i18n.language)}</span>
                           {en.finalGrade !== null && (
                             <span className="font-bold text-emerald-500">GRADE: {en.finalGrade}</span>
                           )}
@@ -665,8 +705,8 @@ export default function StudentsPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
           <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 max-w-lg w-full rounded-2xl p-6 shadow-2xl space-y-4 animate-fade-in">
             <div className="flex justify-between items-center">
-              <h3 className="text-sm font-bold uppercase tracking-wider">New Student Registration</h3>
-              <button onClick={() => setCreateModalOpen(false)} className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg">
+              <h3 className="text-sm font-bold uppercase tracking-wider">{t('students.addStudent')}</h3>
+              <button onClick={() => setCreateModalOpen(false)} className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg cursor-pointer">
                 <X className="w-4 h-4" />
               </button>
             </div>
@@ -674,7 +714,7 @@ export default function StudentsPage() {
             <form onSubmit={handleCreateSubmit} className="space-y-4 text-xs">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1">First Name</label>
+                  <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1">{t('instructors.firstName')}</label>
                   <input
                     type="text"
                     required
@@ -685,7 +725,7 @@ export default function StudentsPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1">Last Name</label>
+                  <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1">{t('instructors.lastName')}</label>
                   <input
                     type="text"
                     required
@@ -698,7 +738,7 @@ export default function StudentsPage() {
               </div>
 
               <div>
-                <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1">Email Address</label>
+                <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1">{t('instructors.email')}</label>
                 <input
                   type="email"
                   required
@@ -710,7 +750,7 @@ export default function StudentsPage() {
               </div>
 
               <div>
-                <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1">Password</label>
+                <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1">{t('login.passwordLabel')}</label>
                 <input
                   type="password"
                   value={formPassword}
@@ -722,7 +762,7 @@ export default function StudentsPage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1">Phone Number</label>
+                  <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1">{t('students.phone')}</label>
                   <input
                     type="text"
                     placeholder="e.g. +1 555-0199"
@@ -732,7 +772,7 @@ export default function StudentsPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1">Date of Birth</label>
+                  <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1">{t('students.dob')}</label>
                   <input
                     type="date"
                     required
@@ -744,15 +784,15 @@ export default function StudentsPage() {
               </div>
 
               <div>
-                <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1">Core Enrollment Status</label>
+                <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1">{t('common.status')}</label>
                 <select
                   value={formStatus}
                   onChange={(e) => setFormStatus(e.target.value as StudentStatus)}
-                  className="w-full p-2.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 focus:outline-none font-semibold text-zinc-700"
+                  className="w-full p-2.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 focus:outline-none font-semibold text-zinc-700 dark:text-zinc-300"
                 >
-                  <option value="Active">Active Student</option>
-                  <option value="Suspended">Suspended</option>
-                  <option value="Graduated">Graduated Alumni</option>
+                  <option value="Active">{t('common.active')}</option>
+                  <option value="Suspended">{t('students.suspendedStatus')}</option>
+                  <option value="Graduated">{t('students.graduatedStatus')}</option>
                 </select>
               </div>
 
@@ -761,7 +801,7 @@ export default function StudentsPage() {
                 disabled={createMutation.isPending}
                 className="w-full py-2.5 text-xs font-semibold text-white dark:text-zinc-950 bg-zinc-900 dark:bg-zinc-50 hover:bg-zinc-800 rounded-xl transition-all cursor-pointer shadow-md"
               >
-                {createMutation.isPending ? 'Registering...' : 'Complete Registration'}
+                {createMutation.isPending ? t('common.loading') : t('students.addStudent')}
               </button>
             </form>
           </div>
@@ -775,8 +815,8 @@ export default function StudentsPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
           <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 max-w-lg w-full rounded-2xl p-6 shadow-2xl space-y-4 animate-fade-in">
             <div className="flex justify-between items-center">
-              <h3 className="text-sm font-bold uppercase tracking-wider">Modify Student Account</h3>
-              <button onClick={() => setEditModalOpen(false)} className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg">
+              <h3 className="text-sm font-bold uppercase tracking-wider">{t('students.editStudent')}</h3>
+              <button onClick={() => setEditModalOpen(false)} className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg cursor-pointer">
                 <X className="w-4 h-4" />
               </button>
             </div>
@@ -784,7 +824,7 @@ export default function StudentsPage() {
             <form onSubmit={handleEditSubmit} className="space-y-4 text-xs">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1">First Name</label>
+                  <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1">{t('instructors.firstName')}</label>
                   <input
                     type="text"
                     required
@@ -794,7 +834,7 @@ export default function StudentsPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1">Last Name</label>
+                  <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1">{t('instructors.lastName')}</label>
                   <input
                     type="text"
                     required
@@ -806,7 +846,7 @@ export default function StudentsPage() {
               </div>
 
               <div>
-                <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1">Change Account Password (Optional)</label>
+                <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1">{t('login.passwordLabel')}</label>
                 <input
                   type="password"
                   value={formPassword}
@@ -818,7 +858,7 @@ export default function StudentsPage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1">Phone Number</label>
+                  <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1">{t('students.phone')}</label>
                   <input
                     type="text"
                     value={formPhone}
@@ -827,15 +867,15 @@ export default function StudentsPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1">Status State</label>
+                  <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1">{t('common.status')}</label>
                   <select
                     value={formStatus}
                     onChange={(e) => setFormStatus(e.target.value as StudentStatus)}
                     className="w-full p-2.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 focus:outline-none"
                   >
-                    <option value="Active">Active</option>
-                    <option value="Suspended">Suspended</option>
-                    <option value="Graduated">Graduated</option>
+                    <option value="Active">{t('common.active')}</option>
+                    <option value="Suspended">{t('students.suspendedStatus')}</option>
+                    <option value="Graduated">{t('students.graduatedStatus')}</option>
                   </select>
                 </div>
               </div>
@@ -845,7 +885,7 @@ export default function StudentsPage() {
                 disabled={updateMutation.isPending}
                 className="w-full py-2.5 text-xs font-semibold text-white dark:text-zinc-950 bg-zinc-900 dark:bg-zinc-50 hover:bg-zinc-800 rounded-xl transition-all cursor-pointer shadow-md"
               >
-                {updateMutation.isPending ? 'Saving...' : 'Save Account Changes'}
+                {updateMutation.isPending ? t('common.loading') : t('common.save')}
               </button>
             </form>
           </div>
@@ -859,15 +899,15 @@ export default function StudentsPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
           <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 max-w-md w-full rounded-2xl p-6 shadow-2xl space-y-4 animate-fade-in">
             <div className="flex justify-between items-center">
-              <h3 className="text-sm font-bold uppercase tracking-wider">Demographic Bio Profile</h3>
-              <button onClick={() => setProfileModalOpen(false)} className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg">
+              <h3 className="text-sm font-bold uppercase tracking-wider">{t('students.biographicProfile')}</h3>
+              <button onClick={() => setProfileModalOpen(false)} className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg cursor-pointer">
                 <X className="w-4 h-4" />
               </button>
             </div>
 
             <form onSubmit={handleProfileSubmit} className="space-y-4 text-xs">
               <div>
-                <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1">Street Address</label>
+                <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1">{t('students.address')}</label>
                 <input
                   type="text"
                   placeholder="123 Main Street"
@@ -879,7 +919,7 @@ export default function StudentsPage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1">City</label>
+                  <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1">{t('students.city')}</label>
                   <input
                     type="text"
                     placeholder="New York"
@@ -889,7 +929,7 @@ export default function StudentsPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1">Country</label>
+                  <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1">{t('students.country')}</label>
                   <input
                     type="text"
                     placeholder="United States"
@@ -901,7 +941,7 @@ export default function StudentsPage() {
               </div>
 
               <div>
-                <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1">Professional Bio</label>
+                <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1">{t('students.bio')}</label>
                 <textarea
                   rows={3}
                   placeholder="Ambitious learner focused on fullstack web engineering..."
@@ -927,7 +967,7 @@ export default function StudentsPage() {
                 disabled={saveProfileMutation.isPending}
                 className="w-full py-2.5 text-xs font-semibold text-white dark:text-zinc-950 bg-zinc-900 dark:bg-zinc-50 hover:bg-zinc-800 rounded-xl transition-all cursor-pointer shadow-md"
               >
-                {saveProfileMutation.isPending ? 'Saving Profile...' : 'Save demographic Profile'}
+                {saveProfileMutation.isPending ? t('common.loading') : t('common.save')}
               </button>
             </form>
           </div>

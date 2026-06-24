@@ -50,8 +50,8 @@ apiClient.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
-    // Check if error is 401 Unauthorized and not already retried
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    // Check if error is 401 Unauthorized and not already retried, and is not an auth request
+    if (error.response?.status === 401 && !originalRequest._retry && !originalRequest.url?.includes('/api/auth/')) {
       if (isRefreshing) {
         // Queue this request and wait for the token to refresh
         return new Promise((resolve, reject) => {

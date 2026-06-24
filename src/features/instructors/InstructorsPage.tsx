@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiService } from '../../services/api';
 import { toast } from '../../components/Toast';
+import { useTranslation } from 'react-i18next';
 import {
   Users,
   Search,
@@ -10,7 +11,6 @@ import {
   Trash2,
   UserCheck,
   UserX,
-  ShieldAlert,
   ChevronRight,
   ChevronLeft,
   Loader2,
@@ -23,6 +23,9 @@ import { CreateInstructorDto, UpdateInstructorDto } from '../../types/api';
 
 export default function InstructorsPage() {
   const queryClient = useQueryClient();
+  const { t, i18n } = useTranslation();
+  const isRtl = i18n.language === 'ar';
+
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<'all' | 'active' | 'inactive'>('all');
   const [selectedInstructorId, setSelectedInstructorId] = useState<number | null>(null);
@@ -62,87 +65,111 @@ export default function InstructorsPage() {
     enabled: selectedInstructorId !== null,
   });
 
-  const { data: assignedCourses } = useQuery({
-    queryKey: ['instructorCourses', selectedInstructorId],
-    queryFn: () => apiService.instructors.getCourses(selectedInstructorId!),
-    enabled: selectedInstructorId !== null,
-  });
-
   const { data: subordinates } = useQuery({
     queryKey: ['instructorSubordinates', selectedInstructorId],
-    queryFn: () => apiService.instructors.getSubordinates(selectedInstructorId!),
+    queryFn: async () => {
+      try {
+        return await apiService.instructors.getSubordinates(selectedInstructorId!);
+      } catch (err: any) {
+        if (err.response?.status === 404 || err.response?.status === 500) {
+          return [];
+        }
+        throw err;
+      }
+    },
     enabled: selectedInstructorId !== null,
   });
 
-  // 2. Mutations
+  const { data: assignedCourses } = useQuery({
+    queryKey: ['instructorCourses', selectedInstructorId],
+    queryFn: async () => {
+      try {
+        return await apiService.instructors.getCourses(selectedInstructorId!);
+      } catch (err: any) {
+        if (err.response?.status === 404 || err.response?.status === 500) {
+          return [];
+        }
+        throw err;
+      }
+    },
+    enabled: selectedInstructorId !== null,
+  });
+
+  // Mutations
   const createMutation = useMutation({
-    mutationFn: apiService.instructors.create,
+    mutationFn: (dto: CreateInstructorDto) => apiService.instructors.create(dto),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['instructors'] });
-      toast.success('Instructor Created', 'New instructor profile added successfully.');
+      toast.success(t('instructors.addFacultySuccess'), t('instructors.addFacultySuccessDesc'));
       setCreateModalOpen(false);
       resetForm();
     },
     onError: (err: any) => {
-      toast.error('Creation Failed', err.response?.data?.message || 'Failed to create instructor.');
+      toast.error(t('common.error'), err.response?.data?.message || err.message);
     },
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: UpdateInstructorDto }) =>
-      apiService.instructors.update(id, data),
-    onSuccess: () => {
+    mutationFn: ({ id, dto }: { id: number; dto: UpdateInstructorDto }) =>
+      apiService.instructors.update(id, dto),
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['instructors'] });
       queryClient.invalidateQueries({ queryKey: ['instructor', selectedInstructorId] });
-      toast.success('Instructor Updated', 'Profile updated successfully.');
+      toast.success(t('instructors.updateFacultySuccess'), t('instructors.updateFacultySuccessDesc'));
       setEditModalOpen(false);
     },
     onError: (err: any) => {
-      toast.error('Update Failed', err.response?.data?.message || 'Failed to update instructor.');
+      toast.error(t('common.error'), err.response?.data?.message || err.message);
     },
   });
 
   const deleteMutation = useMutation({
-    mutationFn: apiService.instructors.delete,
+    mutationFn: (id: number) => apiService.instructors.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['instructors'] });
-      toast.success('Instructor Deleted', 'Instructor profile removed successfully.');
       setSelectedInstructorId(null);
+      toast.success(t('instructors.deleteFacultySuccess'), t('instructors.deleteFacultySuccessDesc'));
     },
     onError: (err: any) => {
-      toast.error('Deletion Failed', err.response?.data?.message || 'Failed to delete instructor.');
+      toast.error(t('common.error'), err.response?.data?.message || err.message);
     },
   });
 
   const activateMutation = useMutation({
-    mutationFn: apiService.instructors.activate,
+    mutationFn: (id: number) => apiService.instructors.activate(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['instructors'] });
       queryClient.invalidateQueries({ queryKey: ['instructor', selectedInstructorId] });
-      toast.success('Activated', 'Instructor has been activated.');
+      toast.success(t('common.success'), t('instructors.updateFacultySuccessDesc'));
+    },
+    onError: (err: any) => {
+      toast.error(t('common.error'), err.response?.data?.message || err.message);
     },
   });
 
   const deactivateMutation = useMutation({
-    mutationFn: apiService.instructors.deactivate,
+    mutationFn: (id: number) => apiService.instructors.deactivate(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['instructors'] });
       queryClient.invalidateQueries({ queryKey: ['instructor', selectedInstructorId] });
-      toast.success('Deactivated', 'Instructor has been deactivated.');
+      toast.success(t('common.success'), t('instructors.updateFacultySuccessDesc'));
+    },
+    onError: (err: any) => {
+      toast.error(t('common.error'), err.response?.data?.message || err.message);
     },
   });
 
   const assignManagerMutation = useMutation({
-    mutationFn: ({ id, managerId }: { id: number; managerId: number | null }) =>
-      apiService.instructors.assignManager(id, { managerId }),
+    mutationFn: ({ instructorId, managerId }: { instructorId: number; managerId: number | null }) =>
+      apiService.instructors.assignManager(instructorId, { managerId }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['instructors'] });
       queryClient.invalidateQueries({ queryKey: ['instructor', selectedInstructorId] });
-      toast.success('Hierarchy Updated', 'Manager assignment saved successfully.');
+      toast.success(t('instructors.updateFacultySuccess'), t('instructors.updateFacultySuccessDesc'));
       setManagerModalOpen(false);
     },
     onError: (err: any) => {
-      toast.error('Assignment Failed', err.response?.data?.message || 'Failed to assign manager.');
+      toast.error(t('common.error'), err.response?.data?.message || err.message);
     },
   });
 
@@ -159,137 +186,135 @@ export default function InstructorsPage() {
 
   const handleCreateSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const payload: CreateInstructorDto = {
+    const managerVal = formManagerId.trim() ? parseInt(formManagerId.trim()) : null;
+    createMutation.mutate({
       firstName: formFirstName,
       lastName: formLastName,
       email: formEmail,
       password: formPassword || 'TempPass123!',
-      salary: Number(formSalary),
+      salary: formSalary,
       hireDate: formHireDate,
-      managerId: formManagerId ? Number(formManagerId) : null,
+      managerId: managerVal,
       isActive: formIsActive,
-    };
-    createMutation.mutate(payload);
+    });
   };
 
   const handleEditOpen = () => {
     if (!instructorDetail) return;
-    setFormFirstName(instructorDetail.fullName?.split(' ')[0] || '');
-    setFormLastName(instructorDetail.fullName?.split(' ')[1] || '');
+    const names = (instructorDetail.fullName || '').split(' ');
+    setFormFirstName(names[0] || '');
+    setFormLastName(names.slice(1).join(' ') || '');
+    setFormEmail(instructorDetail.email);
     setFormPassword('');
     setFormSalary(instructorDetail.salary);
-    setFormManagerId(instructorDetail.managerId?.toString() || '');
     setFormIsActive(instructorDetail.isActive);
+    setFormManagerId(instructorDetail.managerId?.toString() || '');
     setEditModalOpen(true);
   };
 
   const handleEditSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedInstructorId) return;
-    const payload: UpdateInstructorDto = {
-      firstName: formFirstName,
-      lastName: formLastName,
-      password: formPassword || null,
-      salary: Number(formSalary),
-      managerId: formManagerId ? Number(formManagerId) : null,
-      isActive: formIsActive,
-    };
-    updateMutation.mutate({ id: selectedInstructorId, data: payload });
+    const managerVal = formManagerId.trim() ? parseInt(formManagerId.trim()) : null;
+    updateMutation.mutate({
+      id: selectedInstructorId,
+      dto: {
+        firstName: formFirstName,
+        lastName: formLastName,
+        salary: formSalary,
+        isActive: formIsActive,
+        password: formPassword.trim() ? formPassword : null,
+        managerId: managerVal,
+      },
+    });
   };
 
   const handleAssignManagerSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedInstructorId) return;
+    const managerVal = selectedManagerId.trim() ? parseInt(selectedManagerId.trim()) : null;
     assignManagerMutation.mutate({
-      id: selectedInstructorId,
-      managerId: selectedManagerId ? Number(selectedManagerId) : null,
+      instructorId: selectedInstructorId,
+      managerId: managerVal,
     });
   };
 
-  // Searching logic
-  const filteredInstructors = instructors?.filter((ins) => {
-    const query = searchQuery.toLowerCase();
-    return (
-      ins.fullName?.toLowerCase().includes(query) ||
-      ins.email?.toLowerCase().includes(query) ||
-      ins.instructorId.toString().includes(query)
-    );
-  }) || [];
+  // Filter local instructors list based on Search query
+  const filteredInstructors = instructors
+    ? instructors.filter((ins) => {
+        const query = searchQuery.toLowerCase();
+        return (
+          ins.fullName.toLowerCase().includes(query) ||
+          ins.email.toLowerCase().includes(query) ||
+          ins.instructorId.toString().includes(query)
+        );
+      })
+    : [];
 
   return (
     <div className="space-y-6">
-      {/* Header and top control triggers */}
+      {/* Upper header section */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Instructors Faculty</h1>
-          <p className="text-xs text-zinc-500 mt-1">Manage corporate instructors, hierarchy subordinates, and assigned syllabus</p>
+          <h1 className="text-xl font-bold tracking-tight">{t('instructors.directoryTitle')}</h1>
+          <p className="text-xs text-zinc-500 mt-0.5">{t('dashboard.resourcesSubtitle')}</p>
         </div>
         <button
           onClick={() => {
             resetForm();
             setCreateModalOpen(true);
           }}
-          className="flex items-center justify-center gap-2 px-4 py-2 text-xs font-semibold text-white dark:text-zinc-950 bg-zinc-900 dark:bg-zinc-50 hover:bg-zinc-800 dark:hover:bg-zinc-100 rounded-xl shadow-md transition-all cursor-pointer"
+          className="flex items-center justify-center gap-1.5 px-4 py-2 text-xs font-semibold text-white dark:text-zinc-950 bg-zinc-900 dark:bg-zinc-50 hover:bg-zinc-800 dark:hover:bg-zinc-100 rounded-xl shadow-sm transition-all cursor-pointer"
         >
           <Plus className="w-4 h-4" />
-          Add Instructor
+          <span>{t('instructors.addInstructor')}</span>
         </button>
       </div>
 
-      {/* Tabs and search filters */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800/80 shadow-sm">
-        {/* Status filters */}
-        <div className="flex bg-zinc-100 dark:bg-zinc-950 p-1 rounded-xl w-fit">
+      {/* Filter tabs & Search area */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-zinc-100/60 dark:bg-zinc-900/40 p-1.5 rounded-2xl border border-zinc-200/50 dark:border-zinc-800/50">
+        <div className="flex gap-1">
           <button
-            onClick={() => {
-              setActiveTab('all');
-              setSelectedInstructorId(null);
-            }}
-            className={`px-4 py-1.5 text-xs font-semibold rounded-lg transition-all ${
+            onClick={() => setActiveTab('all')}
+            className={`px-4 py-1.5 text-xs font-semibold rounded-xl transition-all cursor-pointer ${
               activeTab === 'all'
-                ? 'bg-white dark:bg-zinc-900 shadow-sm text-zinc-900 dark:text-zinc-50'
+                ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-50 shadow-sm'
                 : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300'
             }`}
           >
-            All Faculty
+            {t('common.all')}
           </button>
           <button
-            onClick={() => {
-              setActiveTab('active');
-              setSelectedInstructorId(null);
-            }}
-            className={`px-4 py-1.5 text-xs font-semibold rounded-lg transition-all ${
+            onClick={() => setActiveTab('active')}
+            className={`px-4 py-1.5 text-xs font-semibold rounded-xl transition-all cursor-pointer ${
               activeTab === 'active'
-                ? 'bg-white dark:bg-zinc-900 shadow-sm text-zinc-900 dark:text-zinc-50'
+                ? 'bg-white dark:bg-zinc-800 text-emerald-600 dark:text-emerald-400 shadow-sm'
                 : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300'
             }`}
           >
-            Active Only
+            {t('common.active')}
           </button>
           <button
-            onClick={() => {
-              setActiveTab('inactive');
-              setSelectedInstructorId(null);
-            }}
-            className={`px-4 py-1.5 text-xs font-semibold rounded-lg transition-all ${
+            onClick={() => setActiveTab('inactive')}
+            className={`px-4 py-1.5 text-xs font-semibold rounded-xl transition-all cursor-pointer ${
               activeTab === 'inactive'
-                ? 'bg-white dark:bg-zinc-900 shadow-sm text-zinc-900 dark:text-zinc-50'
+                ? 'bg-white dark:bg-zinc-800 text-rose-600 dark:text-rose-400 shadow-sm'
                 : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300'
             }`}
           >
-            Inactive
+            {t('common.inactive')}
           </button>
         </div>
 
         {/* Search Input */}
         <div className="relative max-w-sm w-full">
-          <Search className="absolute left-3 top-2.5 w-4 h-4 text-zinc-400" />
+          <Search className={`absolute ${isRtl ? 'right-3' : 'left-3'} top-2.5 w-4 h-4 text-zinc-400`} />
           <input
             type="text"
-            placeholder="Search by ID, name or email..."
+            placeholder={t('instructors.searchPlaceholder')}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-4 py-1.5 text-xs rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 focus:outline-none focus:ring-1 focus:ring-zinc-900 dark:focus:ring-zinc-50 transition-all"
+            className={`w-full ${isRtl ? 'pr-9 pl-4' : 'pl-9 pr-4'} py-1.5 text-xs rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 focus:outline-none focus:ring-1 focus:ring-zinc-900 dark:focus:ring-zinc-50 transition-all`}
           />
         </div>
       </div>
@@ -298,27 +323,29 @@ export default function InstructorsPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Side: Instructors List Table */}
         <div className={`lg:col-span-2 p-6 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm space-y-4 ${selectedInstructorId ? 'hidden lg:block' : 'block'}`}>
-          <h2 className="text-sm font-bold uppercase tracking-wider text-zinc-400">Instructors Directory ({filteredInstructors.length})</h2>
+          <h2 className="text-sm font-bold uppercase tracking-wider text-zinc-400">
+            {t('instructors.directoryTitle')} ({filteredInstructors.length})
+          </h2>
 
           {isLoading ? (
             <div className="py-12 flex flex-col items-center justify-center gap-2">
               <Loader2 className="w-6 h-6 animate-spin text-zinc-500" />
-              <p className="text-xs text-zinc-400">Loading faculty roster...</p>
+              <p className="text-xs text-zinc-400">{t('instructors.loadingList')}</p>
             </div>
           ) : filteredInstructors.length === 0 ? (
             <div className="py-12 text-center border border-dashed border-zinc-200 dark:border-zinc-800 rounded-xl space-y-2">
               <Users className="w-8 h-8 text-zinc-300 mx-auto" />
-              <p className="text-xs font-medium text-zinc-400">No instructors found matching criteria.</p>
+              <p className="text-xs font-medium text-zinc-400">{t('instructors.noInstructors')}</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
+              <table className={`w-full ${isRtl ? 'text-right' : 'text-left'} text-xs`}>
                 <thead>
                   <tr className="border-b border-zinc-100 dark:border-zinc-800 text-zinc-400 font-semibold uppercase tracking-wider">
-                    <th className="py-3 px-2">ID</th>
-                    <th className="py-3 px-2">Instructor Name</th>
-                    <th className="py-3 px-2">Status</th>
-                    <th className="py-3 px-2 text-right">Action</th>
+                    <th className="py-3 px-2">{t('common.id')}</th>
+                    <th className="py-3 px-2">{t('instructors.addInstructor')}</th>
+                    <th className="py-3 px-2">{t('common.status')}</th>
+                    <th className={`py-3 px-2 ${isRtl ? 'text-left' : 'text-right'}`}>{t('common.actions')}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/40 font-medium">
@@ -347,11 +374,15 @@ export default function InstructorsPage() {
                                 : 'bg-rose-50 dark:bg-rose-950/20 text-rose-600 dark:text-rose-400'
                             }`}
                           >
-                            {ins.isActive ? 'Active' : 'Inactive'}
+                            {ins.isActive ? t('instructors.activeStatus') : t('instructors.inactiveStatus')}
                           </span>
                         </td>
-                        <td className="py-3.5 px-2 text-right">
-                          <ChevronRight className="w-4 h-4 text-zinc-400 inline" />
+                        <td className={`py-3.5 px-2 ${isRtl ? 'text-left' : 'text-right'}`}>
+                          {isRtl ? (
+                            <ChevronLeft className="w-4 h-4 text-zinc-400 inline" />
+                          ) : (
+                            <ChevronRight className="w-4 h-4 text-zinc-400 inline" />
+                          )}
                         </td>
                       </tr>
                     );
@@ -368,52 +399,52 @@ export default function InstructorsPage() {
             <div className="h-full py-16 flex flex-col items-center justify-center text-center gap-3">
               <Users className="w-10 h-10 text-zinc-300" />
               <div>
-                <h3 className="text-xs font-bold uppercase tracking-wider">Faculty Workspace</h3>
+                <h3 className="text-xs font-bold uppercase tracking-wider">{t('instructors.detailsPlaceholderTitle')}</h3>
                 <p className="text-xs text-zinc-400 max-w-xs mt-1 leading-relaxed">
-                  Select an instructor from the directory to review hire date, manager assignments, subordinate structures, and active syllabus.
+                  {t('instructors.detailsPlaceholderDesc')}
                 </p>
               </div>
             </div>
           ) : !instructorDetail ? (
             <div className="py-12 flex flex-col items-center justify-center gap-2">
               <Loader2 className="w-6 h-6 animate-spin text-zinc-500" />
-              <p className="text-xs text-zinc-400">Fetching workspace record...</p>
+              <p className="text-xs text-zinc-400">{t('common.loading')}</p>
             </div>
           ) : (
             <div className="space-y-6 animate-fade-in">
               {/* Back button for mobile screens */}
               <button
                 onClick={() => setSelectedInstructorId(null)}
-                className="lg:hidden mb-4 flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                className="lg:hidden mb-4 flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
               >
-                <ChevronLeft className="w-4 h-4" />
-                Back to Instructors Directory
+                {isRtl ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+                <span>{t('instructors.backToFaculty')}</span>
               </button>
 
               {/* Workspace Header */}
               <div className="pb-4 border-b border-zinc-100 dark:border-zinc-800">
                 <div className="flex justify-between items-start gap-2">
                   <div>
-                    <span className="text-[10px] font-mono font-bold text-zinc-400">INSTRUCTOR ID: {instructorDetail.instructorId}</span>
+                    <span className="text-[10px] font-mono font-bold text-zinc-400">{t('instructors.instructorId')}: {instructorDetail.instructorId}</span>
                     <h2 className="text-base font-bold tracking-tight mt-0.5">{instructorDetail.fullName}</h2>
                     <p className="text-xs text-zinc-400">{instructorDetail.email}</p>
                   </div>
                   <div className="flex gap-1">
                     <button
                       onClick={handleEditOpen}
-                      className="p-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500 dark:text-zinc-400"
-                      title="Edit Profile"
+                      className="p-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500 dark:text-zinc-400 cursor-pointer"
+                      title={t('common.edit')}
                     >
                       <Edit2 className="w-3.5 h-3.5" />
                     </button>
                     <button
                       onClick={() => {
-                        if (confirm('Are you absolutely sure you want to delete this instructor? This action is irreversible.')) {
+                        if (confirm(t('instructors.deleteConfirm'))) {
                           deleteMutation.mutate(instructorDetail.instructorId);
                         }
                       }}
-                      className="p-1.5 rounded-lg border border-rose-200/50 dark:border-rose-900/30 hover:bg-rose-50 dark:hover:bg-rose-950/20 text-rose-600 dark:text-rose-400"
-                      title="Delete Instructor"
+                      className="p-1.5 rounded-lg border border-rose-200/50 dark:border-rose-900/30 hover:bg-rose-50 dark:hover:bg-rose-950/20 text-rose-600 dark:text-rose-400 cursor-pointer"
+                      title={t('common.delete')}
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
@@ -425,18 +456,18 @@ export default function InstructorsPage() {
                   {instructorDetail.isActive ? (
                     <button
                       onClick={() => deactivateMutation.mutate(instructorDetail.instructorId)}
-                      className="flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-xl text-[10px] font-bold uppercase tracking-wider border border-rose-200 dark:border-rose-900/30 bg-rose-50/40 dark:bg-rose-950/10 text-rose-600 dark:text-rose-400"
+                      className="flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-xl text-[10px] font-bold uppercase tracking-wider border border-rose-200 dark:border-rose-900/30 bg-rose-50/40 dark:bg-rose-950/10 text-rose-600 dark:text-rose-400 cursor-pointer"
                     >
                       <UserX className="w-3.5 h-3.5" />
-                      Deactivate
+                      <span>{t('common.inactive')}</span>
                     </button>
                   ) : (
                     <button
                       onClick={() => activateMutation.mutate(instructorDetail.instructorId)}
-                      className="flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-xl text-[10px] font-bold uppercase tracking-wider border border-emerald-200 dark:border-emerald-900/30 bg-emerald-50/40 dark:bg-emerald-950/10 text-emerald-600 dark:text-emerald-400"
+                      className="flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-xl text-[10px] font-bold uppercase tracking-wider border border-emerald-200 dark:border-emerald-900/30 bg-emerald-50/40 dark:bg-emerald-950/10 text-emerald-600 dark:text-emerald-400 cursor-pointer"
                     >
                       <UserCheck className="w-3.5 h-3.5" />
-                      Activate
+                      <span>{t('common.active')}</span>
                     </button>
                   )}
                   <button
@@ -444,10 +475,10 @@ export default function InstructorsPage() {
                       setSelectedManagerId(instructorDetail.managerId?.toString() || '');
                       setManagerModalOpen(true);
                     }}
-                    className="flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-xl text-[10px] font-bold uppercase tracking-wider border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 text-zinc-600 dark:text-zinc-400"
+                    className="flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-xl text-[10px] font-bold uppercase tracking-wider border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 text-zinc-600 dark:text-zinc-400 cursor-pointer"
                   >
                     <Award className="w-3.5 h-3.5" />
-                    Set Manager
+                    <span>{t('instructors.manager')}</span>
                   </button>
                 </div>
               </div>
@@ -455,31 +486,33 @@ export default function InstructorsPage() {
               {/* Salary & Hire details */}
               <div className="grid grid-cols-2 gap-4 text-xs">
                 <div className="space-y-1">
-                  <span className="text-zinc-400 block font-semibold uppercase tracking-wider text-[9px]">Annual Salary</span>
+                  <span className="text-zinc-400 block font-semibold uppercase tracking-wider text-[9px]">{t('instructors.salary')}</span>
                   <span className="font-bold text-zinc-800 dark:text-zinc-200">${instructorDetail.salary.toLocaleString()}</span>
                 </div>
                 <div className="space-y-1">
-                  <span className="text-zinc-400 block font-semibold uppercase tracking-wider text-[9px]">Hire Date</span>
+                  <span className="text-zinc-400 block font-semibold uppercase tracking-wider text-[9px]">{t('instructors.hireDate')}</span>
                   <span className="font-bold text-zinc-800 dark:text-zinc-200 flex items-center gap-1">
                     <Calendar className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
-                    {new Date(instructorDetail.hireDate).toLocaleDateString()}
+                    <span>{new Date(instructorDetail.hireDate).toLocaleDateString(i18n.language)}</span>
                   </span>
                 </div>
               </div>
 
               {/* Manager assignment status */}
               <div className="p-3.5 rounded-xl border border-zinc-100 dark:border-zinc-800/50 bg-zinc-50/50 dark:bg-zinc-900/30 text-xs">
-                <span className="text-[9px] font-bold uppercase tracking-wider text-zinc-400 block mb-1">Assigned Supervisor</span>
+                <span className="text-[9px] font-bold uppercase tracking-wider text-zinc-400 block mb-1">{t('instructors.manager')}</span>
                 {instructorDetail.managerId ? (
-                  <p className="font-bold text-zinc-800 dark:text-zinc-200">Manager ID: {instructorDetail.managerId}</p>
+                  <p className="font-bold text-zinc-800 dark:text-zinc-200">{t('instructors.manager')}: {instructorDetail.managerId}</p>
                 ) : (
-                  <p className="text-zinc-500 font-medium">No manager assigned (Independent Faculty)</p>
+                  <p className="text-zinc-500 font-medium">{t('instructors.managerNone')}</p>
                 )}
               </div>
 
               {/* Subordinates section */}
               <div className="space-y-2.5">
-                <h4 className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Subordinates ({subordinates?.length || 0})</h4>
+                <h4 className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                  {t('instructors.subordinatesTitle')} ({subordinates?.length || 0})
+                </h4>
                 {subordinates?.length === 0 ? (
                   <p className="text-xs text-zinc-500 font-medium italic">No managed subordinates assigned.</p>
                 ) : (
@@ -490,7 +523,7 @@ export default function InstructorsPage() {
                           <p className="font-semibold text-zinc-800 dark:text-zinc-200">{sub.fullName}</p>
                           <p className="text-[9px] text-zinc-400">{sub.email}</p>
                         </div>
-                        <span className="text-[9px] font-bold uppercase text-emerald-500">{sub.isActive ? 'Active' : 'Inactive'}</span>
+                        <span className="text-[9px] font-bold uppercase text-emerald-500">{sub.isActive ? t('instructors.activeStatus') : t('instructors.inactiveStatus')}</span>
                       </div>
                     ))}
                   </div>
@@ -501,7 +534,7 @@ export default function InstructorsPage() {
               <div className="space-y-2.5 pt-4 border-t border-zinc-100 dark:border-zinc-800">
                 <h4 className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 flex items-center gap-1">
                   <BookOpen className="w-3.5 h-3.5 text-zinc-400" />
-                  Syllabus Courses Assigned ({assignedCourses?.length || 0})
+                  <span>{t('courses.directoryTitle')} ({assignedCourses?.length || 0})</span>
                 </h4>
                 {assignedCourses?.length === 0 ? (
                   <p className="text-xs text-zinc-500 font-medium italic">No active courses assigned to this instructor.</p>
@@ -513,7 +546,7 @@ export default function InstructorsPage() {
                         <div className="flex justify-between items-center mt-1 text-[9px] text-zinc-400 font-semibold uppercase">
                           <span>CODE: {crs.code}</span>
                           <span className={`px-1.5 py-0.5 rounded-full ${crs.status === 'Published' ? 'bg-emerald-50 text-emerald-500' : 'bg-amber-50 text-amber-500'}`}>
-                            {crs.status}
+                            {crs.status === 'Published' ? t('courses.published') : crs.status === 'Draft' ? t('courses.draft') : t('courses.archived')}
                           </span>
                         </div>
                       </div>
@@ -533,8 +566,8 @@ export default function InstructorsPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
           <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 max-w-lg w-full rounded-2xl p-6 shadow-2xl space-y-4 animate-fade-in">
             <div className="flex justify-between items-center">
-              <h3 className="text-sm font-bold uppercase tracking-wider">New Instructor Registration</h3>
-              <button onClick={() => setCreateModalOpen(false)} className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg">
+              <h3 className="text-sm font-bold uppercase tracking-wider">{t('instructors.addInstructor')}</h3>
+              <button onClick={() => setCreateModalOpen(false)} className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg cursor-pointer">
                 <X className="w-4 h-4" />
               </button>
             </div>
@@ -542,7 +575,7 @@ export default function InstructorsPage() {
             <form onSubmit={handleCreateSubmit} className="space-y-4 text-xs">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1">First Name</label>
+                  <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1">{t('instructors.firstName')}</label>
                   <input
                     type="text"
                     required
@@ -553,7 +586,7 @@ export default function InstructorsPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1">Last Name</label>
+                  <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1">{t('instructors.lastName')}</label>
                   <input
                     type="text"
                     required
@@ -566,7 +599,7 @@ export default function InstructorsPage() {
               </div>
 
               <div>
-                <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1">Email address</label>
+                <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1">{t('instructors.email')}</label>
                 <input
                   type="email"
                   required
@@ -578,7 +611,7 @@ export default function InstructorsPage() {
               </div>
 
               <div>
-                <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1">Security Password</label>
+                <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1">{t('login.passwordLabel')}</label>
                 <input
                   type="password"
                   value={formPassword}
@@ -590,7 +623,7 @@ export default function InstructorsPage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1">Annual Salary ($)</label>
+                  <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1">{t('instructors.salary')}</label>
                   <input
                     type="number"
                     value={formSalary}
@@ -599,7 +632,7 @@ export default function InstructorsPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1">Hire Date</label>
+                  <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1">{t('instructors.hireDate')}</label>
                   <input
                     type="date"
                     required
@@ -612,7 +645,7 @@ export default function InstructorsPage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1">Manager Assign ID (Optional)</label>
+                  <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1">{t('instructors.managerPlaceholder')}</label>
                   <input
                     type="number"
                     placeholder="e.g. 1"
@@ -622,14 +655,14 @@ export default function InstructorsPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1">Active Status</label>
+                  <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1">{t('common.status')}</label>
                   <select
                     value={formIsActive ? 'true' : 'false'}
                     onChange={(e) => setFormIsActive(e.target.value === 'true')}
-                    className="w-full p-2.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 focus:outline-none font-semibold text-zinc-700"
+                    className="w-full p-2.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 focus:outline-none font-semibold text-zinc-700 dark:text-zinc-300"
                   >
-                    <option value="true">Active</option>
-                    <option value="false">Inactive</option>
+                    <option value="true">{t('instructors.activeStatus')}</option>
+                    <option value="false">{t('instructors.inactiveStatus')}</option>
                   </select>
                 </div>
               </div>
@@ -639,7 +672,7 @@ export default function InstructorsPage() {
                 disabled={createMutation.isPending}
                 className="w-full py-2.5 text-xs font-semibold text-white dark:text-zinc-950 bg-zinc-900 dark:bg-zinc-50 hover:bg-zinc-800 rounded-xl transition-all cursor-pointer shadow-md disabled:opacity-50"
               >
-                {createMutation.isPending ? 'Saving Instructor...' : 'Register Instructor'}
+                {createMutation.isPending ? t('instructors.savingFaculty') : t('instructors.addInstructor')}
               </button>
             </form>
           </div>
@@ -653,8 +686,8 @@ export default function InstructorsPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
           <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 max-w-lg w-full rounded-2xl p-6 shadow-2xl space-y-4 animate-fade-in">
             <div className="flex justify-between items-center">
-              <h3 className="text-sm font-bold uppercase tracking-wider">Edit Instructor Profile</h3>
-              <button onClick={() => setEditModalOpen(false)} className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg">
+              <h3 className="text-sm font-bold uppercase tracking-wider">{t('instructors.editInstructor')}</h3>
+              <button onClick={() => setEditModalOpen(false)} className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg cursor-pointer">
                 <X className="w-4 h-4" />
               </button>
             </div>
@@ -662,7 +695,7 @@ export default function InstructorsPage() {
             <form onSubmit={handleEditSubmit} className="space-y-4 text-xs">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1">First Name</label>
+                  <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1">{t('instructors.firstName')}</label>
                   <input
                     type="text"
                     required
@@ -672,7 +705,7 @@ export default function InstructorsPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1">Last Name</label>
+                  <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1">{t('instructors.lastName')}</label>
                   <input
                     type="text"
                     required
@@ -684,7 +717,18 @@ export default function InstructorsPage() {
               </div>
 
               <div>
-                <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1">Change Security Password (Optional)</label>
+                <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1">{t('instructors.email')}</label>
+                <input
+                  type="email"
+                  required
+                  disabled
+                  value={formEmail}
+                  className="w-full p-2.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-100 dark:bg-zinc-900/60 text-zinc-500 cursor-not-allowed focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1">{t('login.passwordLabel')}</label>
                 <input
                   type="password"
                   value={formPassword}
@@ -696,7 +740,7 @@ export default function InstructorsPage() {
 
               <div className="grid grid-cols-3 gap-4">
                 <div className="col-span-2">
-                  <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1">Annual Salary ($)</label>
+                  <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1">{t('instructors.salary')}</label>
                   <input
                     type="number"
                     value={formSalary}
@@ -705,20 +749,20 @@ export default function InstructorsPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1">Active Status</label>
+                  <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1">{t('common.status')}</label>
                   <select
                     value={formIsActive ? 'true' : 'false'}
                     onChange={(e) => setFormIsActive(e.target.value === 'true')}
                     className="w-full p-2.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 focus:outline-none"
                   >
-                    <option value="true">Active</option>
-                    <option value="false">Inactive</option>
+                    <option value="true">{t('instructors.activeStatus')}</option>
+                    <option value="false">{t('instructors.inactiveStatus')}</option>
                   </select>
                 </div>
               </div>
 
               <div>
-                <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1">Manager Assign ID (Optional)</label>
+                <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1">{t('instructors.managerPlaceholder')}</label>
                 <input
                   type="number"
                   placeholder="e.g. 1"
@@ -733,7 +777,7 @@ export default function InstructorsPage() {
                 disabled={updateMutation.isPending}
                 className="w-full py-2.5 text-xs font-semibold text-white dark:text-zinc-950 bg-zinc-900 dark:bg-zinc-50 hover:bg-zinc-800 rounded-xl transition-all cursor-pointer shadow-md disabled:opacity-50"
               >
-                {updateMutation.isPending ? 'Updating Profile...' : 'Save Profile Changes'}
+                {updateMutation.isPending ? t('instructors.savingFaculty') : t('instructors.editInstructor')}
               </button>
             </form>
           </div>
@@ -747,15 +791,15 @@ export default function InstructorsPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
           <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 max-w-sm w-full rounded-2xl p-6 shadow-2xl space-y-4 animate-fade-in">
             <div className="flex justify-between items-center">
-              <h3 className="text-sm font-bold uppercase tracking-wider">Assign Instructor Manager</h3>
-              <button onClick={() => setManagerModalOpen(false)} className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg">
+              <h3 className="text-sm font-bold uppercase tracking-wider">{t('instructors.manager')}</h3>
+              <button onClick={() => setManagerModalOpen(false)} className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg cursor-pointer">
                 <X className="w-4 h-4" />
               </button>
             </div>
 
             <form onSubmit={handleAssignManagerSubmit} className="space-y-4 text-xs">
               <div>
-                <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-2">Manager ID Number</label>
+                <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-2">{t('instructors.manager')}</label>
                 <input
                   type="number"
                   placeholder="e.g. 2 (Leave empty to remove manager)"
@@ -773,7 +817,7 @@ export default function InstructorsPage() {
                 disabled={assignManagerMutation.isPending}
                 className="w-full py-2.5 text-xs font-semibold text-white dark:text-zinc-950 bg-zinc-900 dark:bg-zinc-50 hover:bg-zinc-800 rounded-xl transition-all cursor-pointer shadow-md"
               >
-                {assignManagerMutation.isPending ? 'Assigning...' : 'Save Hierarchy Manager'}
+                {assignManagerMutation.isPending ? t('common.loading') : t('common.save')}
               </button>
             </form>
           </div>

@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { apiService } from '../../services/api';
+import { useTranslation } from 'react-i18next';
 import {
   Users,
   GraduationCap,
@@ -10,12 +11,16 @@ import {
   XCircle,
   Activity,
   ArrowRight,
+  ArrowLeft,
   TrendingUp,
   Award
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 export default function DashboardPage() {
+  const { t, i18n } = useTranslation();
+  const isRtl = i18n.language === 'ar';
+
   // Fetch Enrollment statistics
   const { data: stats, isLoading: statsLoading } = useQuery({
     queryKey: ['enrollmentStats'],
@@ -81,13 +86,13 @@ export default function DashboardPage() {
       {/* Top Welcome Title */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">System Overview</h1>
-          <p className="text-xs text-zinc-500 mt-1">Real-time indicators and operational matrix of Training Center</p>
+          <h1 className="text-2xl font-bold tracking-tight">{t('dashboard.systemOverview')}</h1>
+          <p className="text-xs text-zinc-500 mt-1">{t('dashboard.systemOverviewDesc')}</p>
         </div>
         <div className="flex items-center gap-2 text-xs bg-zinc-100 dark:bg-zinc-900 px-3 py-1.5 rounded-xl border border-zinc-200/50 dark:border-zinc-800/50 font-medium">
           <Activity className="w-3.5 h-3.5 text-emerald-500 animate-pulse shrink-0" />
-          <span className="text-zinc-500">API Gateway Status:</span>
-          <span className="text-emerald-500 font-semibold uppercase">Online</span>
+          <span className="text-zinc-500">{t('dashboard.apiGatewayStatus')}</span>
+          <span className="text-emerald-500 font-semibold uppercase">{t('common.online')}</span>
         </div>
       </div>
 
@@ -96,7 +101,7 @@ export default function DashboardPage() {
         {/* Card 1 */}
         <div className="p-5 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 flex items-center justify-between shadow-sm">
           <div className="space-y-2">
-            <span className="text-xs font-semibold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">Total Registrations</span>
+            <span className="text-xs font-semibold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">{t('dashboard.totalRegistrations')}</span>
             <p className="text-2xl font-bold tracking-tight">{stats?.totalEnrollments || 0}</p>
           </div>
           <div className="p-3.5 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300">
@@ -107,7 +112,7 @@ export default function DashboardPage() {
         {/* Card 2 */}
         <div className="p-5 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 flex items-center justify-between shadow-sm">
           <div className="space-y-2">
-            <span className="text-xs font-semibold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">Active Enrollment</span>
+            <span className="text-xs font-semibold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">{t('dashboard.activeEnrollment')}</span>
             <p className="text-2xl font-bold tracking-tight text-amber-600 dark:text-amber-400">
               {stats?.activeEnrollments || 0}
             </p>
@@ -120,7 +125,7 @@ export default function DashboardPage() {
         {/* Card 3 */}
         <div className="p-5 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 flex items-center justify-between shadow-sm">
           <div className="space-y-2">
-            <span className="text-xs font-semibold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">Completed Grad</span>
+            <span className="text-xs font-semibold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">{t('dashboard.completedGrad')}</span>
             <p className="text-2xl font-bold tracking-tight text-emerald-600 dark:text-emerald-400 animate-fade-in">
               {stats?.completedEnrollments || 0}
             </p>
@@ -133,7 +138,7 @@ export default function DashboardPage() {
         {/* Card 4 */}
         <div className="p-5 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 flex items-center justify-between shadow-sm">
           <div className="space-y-2">
-            <span className="text-xs font-semibold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">Dropped Course</span>
+            <span className="text-xs font-semibold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">{t('dashboard.droppedCourse')}</span>
             <p className="text-2xl font-bold tracking-tight text-rose-600 dark:text-rose-400">
               {stats?.droppedEnrollments || 0}
             </p>
@@ -150,8 +155,8 @@ export default function DashboardPage() {
         <div className="lg:col-span-2 p-6 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm space-y-6">
           <div className="flex items-center justify-between">
             <div className="space-y-1">
-              <h2 className="text-base font-bold tracking-tight">Resources Allocation Summary</h2>
-              <p className="text-xs text-zinc-400">Inventory and deployment metrics</p>
+              <h2 className="text-base font-bold tracking-tight">{t('dashboard.resourcesAllocation')}</h2>
+              <p className="text-xs text-zinc-400">{t('dashboard.resourcesSubtitle')}</p>
             </div>
             <TrendingUp className="w-4 h-4 text-zinc-400" />
           </div>
@@ -163,9 +168,11 @@ export default function DashboardPage() {
                 <Users className="w-4 h-4" />
               </div>
               <div>
-                <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider block">Instructors</span>
+                <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider block">{t('dashboard.instructorsCount')}</span>
                 <p className="text-base font-bold tracking-tight">{totalInstructorsCount}</p>
-                <span className="text-[9px] text-emerald-500 font-medium">({activeInstructorsCount} Active)</span>
+                <span className="text-[9px] text-emerald-500 font-medium">
+                  ({t('dashboard.activeCount', { count: activeInstructorsCount })})
+                </span>
               </div>
             </div>
 
@@ -175,9 +182,11 @@ export default function DashboardPage() {
                 <GraduationCap className="w-4 h-4" />
               </div>
               <div>
-                <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider block">Students</span>
+                <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider block">{t('dashboard.studentsCount')}</span>
                 <p className="text-base font-bold tracking-tight">{totalStudentsCount}</p>
-                <span className="text-[9px] text-emerald-500 font-medium">({activeStudentsCount} Active)</span>
+                <span className="text-[9px] text-emerald-500 font-medium">
+                  ({t('dashboard.activeCount', { count: activeStudentsCount })})
+                </span>
               </div>
             </div>
 
@@ -187,21 +196,23 @@ export default function DashboardPage() {
                 <BookOpen className="w-4 h-4" />
               </div>
               <div>
-                <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider block">Courses</span>
+                <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider block">{t('dashboard.coursesCount')}</span>
                 <p className="text-base font-bold tracking-tight">{totalCoursesCount}</p>
-                <span className="text-[9px] text-zinc-500 font-medium">({publishedCoursesCount} Published)</span>
+                <span className="text-[9px] text-zinc-500 font-medium">
+                  ({t('dashboard.publishedCount', { count: publishedCoursesCount })})
+                </span>
               </div>
             </div>
           </div>
 
           {/* Quick CSS/HTML dynamic bar graph visualization of enrollments */}
           <div className="space-y-4 pt-4 border-t border-zinc-100 dark:border-zinc-800/60">
-            <h3 className="text-xs font-bold text-zinc-600 dark:text-zinc-400 uppercase tracking-wider">Registration Ratio Analysis</h3>
+            <h3 className="text-xs font-bold text-zinc-600 dark:text-zinc-400 uppercase tracking-wider">{t('dashboard.registrationRatio')}</h3>
             <div className="space-y-3.5">
               {/* Active */}
               <div className="space-y-1.5">
                 <div className="flex justify-between text-xs">
-                  <span className="font-medium text-zinc-600 dark:text-zinc-400">Active Course Attendees</span>
+                  <span className="font-medium text-zinc-600 dark:text-zinc-400">{t('dashboard.activeAttendees')}</span>
                   <span className="font-semibold">{stats?.totalEnrollments ? Math.round(((stats.activeEnrollments) / stats.totalEnrollments) * 100) : 0}%</span>
                 </div>
                 <div className="h-2 w-full bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
@@ -215,7 +226,7 @@ export default function DashboardPage() {
               {/* Completed */}
               <div className="space-y-1.5">
                 <div className="flex justify-between text-xs">
-                  <span className="font-medium text-zinc-600 dark:text-zinc-400">Successfully Completed / Graduated</span>
+                  <span className="font-medium text-zinc-600 dark:text-zinc-400">{t('dashboard.successfullyCompleted')}</span>
                   <span className="font-semibold">{stats?.totalEnrollments ? Math.round(((stats.completedEnrollments) / stats.totalEnrollments) * 100) : 0}%</span>
                 </div>
                 <div className="h-2 w-full bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
@@ -229,7 +240,7 @@ export default function DashboardPage() {
               {/* Dropped */}
               <div className="space-y-1.5">
                 <div className="flex justify-between text-xs">
-                  <span className="font-medium text-zinc-600 dark:text-zinc-400">Dropped / Discontinued</span>
+                  <span className="font-medium text-zinc-600 dark:text-zinc-400">{t('dashboard.droppedDiscontinued')}</span>
                   <span className="font-semibold">{stats?.totalEnrollments ? Math.round(((stats.droppedEnrollments) / stats.totalEnrollments) * 100) : 0}%</span>
                 </div>
                 <div className="h-2 w-full bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
@@ -246,8 +257,8 @@ export default function DashboardPage() {
         {/* Quick System Summary panel */}
         <div className="p-6 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm space-y-6">
           <div className="space-y-1">
-            <h2 className="text-base font-bold tracking-tight">System Summary</h2>
-            <p className="text-xs text-zinc-400">Enterprise operational context</p>
+            <h2 className="text-base font-bold tracking-tight">{t('dashboard.systemSummary')}</h2>
+            <p className="text-xs text-zinc-400">{t('dashboard.systemSummarySubtitle')}</p>
           </div>
 
           <div className="space-y-4">
@@ -256,9 +267,9 @@ export default function DashboardPage() {
                 <Award className="w-4 h-4" />
               </div>
               <div>
-                <h4 className="text-xs font-bold">Managerial Hierarchies</h4>
+                <h4 className="text-xs font-bold">{t('dashboard.managerialHierarchiesTitle')}</h4>
                 <p className="text-[11px] text-zinc-500 mt-0.5 leading-relaxed">
-                  Support for instructor managers and subordinate workflow tracking is fully active.
+                  {t('dashboard.managerialHierarchiesDesc')}
                 </p>
               </div>
             </div>
@@ -268,9 +279,9 @@ export default function DashboardPage() {
                 <BookOpen className="w-4 h-4" />
               </div>
               <div>
-                <h4 className="text-xs font-bold">Course States Workflow</h4>
+                <h4 className="text-xs font-bold">{t('dashboard.courseStatesTitle')}</h4>
                 <p className="text-[11px] text-zinc-500 mt-0.5 leading-relaxed">
-                  Toggle course visibility through Draft, Published, and Archived states dynamically.
+                  {t('dashboard.courseStatesDesc')}
                 </p>
               </div>
             </div>
@@ -280,9 +291,9 @@ export default function DashboardPage() {
                 <GraduationCap className="w-4 h-4" />
               </div>
               <div>
-                <h4 className="text-xs font-bold">Student Profile Records</h4>
+                <h4 className="text-xs font-bold">{t('dashboard.studentProfileTitle')}</h4>
                 <p className="text-[11px] text-zinc-500 mt-0.5 leading-relaxed">
-                  Store demographic bios, LinkedIn profiles, and address details directly linked with core accounts.
+                  {t('dashboard.studentProfileDesc')}
                 </p>
               </div>
             </div>
@@ -294,32 +305,32 @@ export default function DashboardPage() {
       <div className="p-6 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm space-y-4">
         <div className="flex items-center justify-between">
           <div className="space-y-1">
-            <h2 className="text-base font-bold tracking-tight">Recent Registration Logs</h2>
-            <p className="text-xs text-zinc-400">The latest student enrollments processed by API</p>
+            <h2 className="text-base font-bold tracking-tight">{t('dashboard.recentLogs')}</h2>
+            <p className="text-xs text-zinc-400">{t('dashboard.recentLogsSubtitle')}</p>
           </div>
           <Link
             to="/enrollments"
             className="text-xs font-semibold flex items-center gap-1 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors"
           >
-            Manage Enrollments
-            <ArrowRight className="w-3.5 h-3.5" />
+            <span>{t('dashboard.manageEnrollments')}</span>
+            {isRtl ? <ArrowLeft className="w-3.5 h-3.5" /> : <ArrowRight className="w-3.5 h-3.5" />}
           </Link>
         </div>
 
         {recentEnrollments.length === 0 ? (
           <div className="py-8 text-center border border-dashed border-zinc-200 dark:border-zinc-800 rounded-xl">
-            <p className="text-xs text-zinc-400">No recent enrollment logs found.</p>
+            <p className="text-xs text-zinc-400">{t('dashboard.noRecentLogs')}</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
+            <table className={`w-full ${isRtl ? 'text-right' : 'text-left'} text-xs`}>
               <thead>
                 <tr className="border-b border-zinc-100 dark:border-zinc-800 text-zinc-400 font-semibold uppercase tracking-wider">
-                  <th className="py-3 px-2">Student</th>
-                  <th className="py-3 px-2">Course Title</th>
-                  <th className="py-3 px-2">Date</th>
-                  <th className="py-3 px-2">Progress</th>
-                  <th className="py-3 px-2 text-right">Status</th>
+                  <th className="py-3 px-2">{t('dashboard.tableStudent')}</th>
+                  <th className="py-3 px-2">{t('dashboard.tableCourse')}</th>
+                  <th className="py-3 px-2">{t('dashboard.tableDate')}</th>
+                  <th className="py-3 px-2">{t('dashboard.tableProgress')}</th>
+                  <th className={`py-3 px-2 ${isRtl ? 'text-left' : 'text-right'}`}>{t('dashboard.tableStatus')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/40 font-medium">
@@ -328,7 +339,7 @@ export default function DashboardPage() {
                     <td className="py-3.5 px-2 font-semibold">{en.studentName || `ID: ${en.studentId}`}</td>
                     <td className="py-3.5 px-2 text-zinc-600 dark:text-zinc-400">{en.courseTitle || `ID: ${en.courseId}`}</td>
                     <td className="py-3.5 px-2 text-zinc-400">
-                      {new Date(en.enrollmentDate).toLocaleDateString()}
+                      {new Date(en.enrollmentDate).toLocaleDateString(i18n.language)}
                     </td>
                     <td className="py-3.5 px-2">
                       <div className="flex items-center gap-2">
@@ -343,7 +354,7 @@ export default function DashboardPage() {
                         </span>
                       </div>
                     </td>
-                    <td className="py-3.5 px-2 text-right">
+                    <td className={`py-3.5 px-2 ${isRtl ? 'text-left' : 'text-right'}`}>
                       <span
                         className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
                           en.status === 'Active'
@@ -353,7 +364,7 @@ export default function DashboardPage() {
                             : 'bg-rose-50 dark:bg-rose-950/20 text-rose-600 dark:text-rose-400'
                         }`}
                       >
-                        {en.status}
+                        {en.status === 'Active' ? t('enrollments.active') : en.status === 'Completed' ? t('enrollments.completed') : t('enrollments.dropped')}
                       </span>
                     </td>
                   </tr>

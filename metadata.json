@@ -1,0 +1,6 @@
+{
+  "name": "Training Center Management System",
+  "description": "Enterprise-grade administration dashboard for instructors, students, courses, and enrollments, integrated with an ASP.NET Core Web API.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
